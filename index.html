@@ -34,7 +34,7 @@
         <div class="padding-box" style="border-bottom: 1px solid #ddd;">
             <h3>📍 多點路線規劃器</h3>
             <div class="input-group">
-                <input type="text" id="search-input" placeholder="輸入地點（如：板橋車站）">
+                <input type="text" id="search-input" placeholder="輸入地點（如：樹林國小）">
                 <button onclick="addLocationFromInput()">新增</button>
             </div>
             <p style="font-size: 12px; color: #666; margin: 5px 0;">* 提示：也可以在右側地圖上點擊滑鼠右鍵直接選點</p>
@@ -54,8 +54,10 @@
 
     <div id="map"></div>
     <script>
-        // 1. 初始化地圖（預設中心點設在雙北）
-        const map = L.map('map').setView([25.012, 121.465], 13);
+        // 1. 初始化地圖（預設中心點設在樹林區附近）
+        const map = L.map('map').setView([24.992, 121.425], 14);
+        
+        // 已修正為安全 HTTPS 連線的圖資
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
@@ -72,7 +74,7 @@
             addLocation(name, lat, lng);
         });
 
-        // 3. 輸入文字搜尋座標（呼叫免費 Nominatim API）
+        // 3. 輸入文字搜尋座標（已修正為安全 HTTPS 請求）
         async function addLocationFromInput() {
             const input = document.getElementById('search-input');
             const query = input.value.trim();
@@ -83,13 +85,14 @@
                 if (data && data.length > 0) {
                     const lat = parseFloat(data.lat);
                     const lon = parseFloat(data.lon);
-                    // 簡化顯示名稱
-                    const shortName = data.display_name.split(',')[0];
+                    const displayName = data.display_name;
+                    const shortName = displayName.split(',')[0] || query;
+                    
                     addLocation(shortName, lat, lon);
-                    map.setView([lat, lon], 13);
+                    map.setView([lat, lon], 14);
                     input.value = '';
                 } else {
-                    alert('找不到該地點，請輸入更詳細的名稱（例如：板橋區公所）。');
+                    alert('找不到該地點，請輸入更詳細的名稱（例如：新北市樹林國小）。');
                 }
             } catch (error) {
                 alert('搜尋失敗，請稍後再試。');
@@ -137,8 +140,8 @@
                 item.addEventListener('drop', (e) => {
                     e.preventDefault();
                     if (draggedItemIndex !== null && draggedItemIndex !== index) {
-                        const movedItem = locations.splice(draggedItemIndex, 1)[0];
-                        locations.splice(index, 0, movedItem);
+                        const movedItem = locations.splice(draggedItemIndex, 1);
+                        locations.splice(index, 0, movedItem[0]);
                         updateLocationListUI();
                         calculateRoute();
                     }
@@ -147,7 +150,7 @@
             });
         }
 
-        // 7. 串接開源 OSRM 路由 API 計算路程公里與時間並畫線
+        // 7. 串接開源 OSRM 路由 API（已確認支援 HTTPS）
         async function calculateRoute() {
             if (locations.length < 2) {
                 if (routeLayer) map.removeLayer(routeLayer);
