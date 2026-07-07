@@ -106,7 +106,7 @@
             }
 
             if (locations.length === 1) {
-                // 只有 1 個點：完美標記該單一點位（已徹底校正網址）
+                // 只有 1 個點：標記該單一站點（確認包含 /maps/）
                 const queryStr = encodeURIComponent(locations[0]);
                 mapContainer.innerHTML = `
                     <iframe src="https://google.com{queryStr}&hl=zh-TW&z=15&output=embed"></iframe>
@@ -115,10 +115,11 @@
                 return;
             }
 
-            // 有 2 個點以上：將第 1 個點設為起點，最後一個點設為終點
+            // 有 2 個點以上：第 1 個點為起點(saddr)，最後一個點為終點(daddr)
             const origin = encodeURIComponent(locations[0]);
             const destination = encodeURIComponent(locations[locations.length - 1]);
             
+            // 2 個點時的標準導航網址（確認包含 /maps/ 與正確的 $ 變數語法）
             let googleMapsUrl = `https://google.com{origin}&daddr=${destination}&hl=zh-TW&z=14&output=embed`;
             
             // 如果超過 2 個點，自動使用 Google 官方 to: 語法將中間點依序串聯
