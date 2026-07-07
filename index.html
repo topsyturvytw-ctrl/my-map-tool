@@ -2,59 +2,63 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>路線規劃筆記本</title>
-<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+TC:wght@400;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/rough.js/2.1.1/rough.js"></script>
 <style>
-  :root { --paper:#F3EEE4; --paper-2:#EAE3D3; --ink:#232323; --red:#B23A2E; --jade:#3F6659; --line:#D8D0BC; }
-  body { margin:0; display:flex; height:100vh; background:var(--paper); font-family:'Noto Sans TC', sans-serif; }
-  #sidebar { width:380px; background:var(--paper-2); border-right:1px solid var(--line); display:flex; flex-direction:column; }
-  .pad { padding:20px; flex:1; overflow-y:auto; }
-  .node-item { background:#fff; padding:12px; margin-bottom:8px; border-radius:6px; cursor:grab; border:1px solid #ccc; display:flex; align-items:center; }
-  #main { flex:1; display:flex; align-items:center; justify-content:center; }
-  #diagram { width:600px; height:800px; }
+  :root{ --paper:#F3EEE4; --paper-2:#EAE3D3; --ink:#232323; --red:#B23A2E; --jade:#3F6659; --line:#D8D0BC; }
+  body{ margin:0; display:flex; height:100vh; background:var(--paper); font-family:'Noto Sans TC', sans-serif; }
+  #sidebar{ width:360px; background:var(--paper-2); border-right:1px solid var(--line); padding:20px; overflow-y:auto; }
+  .loc-item{ background:#fff; padding:12px; margin-bottom:8px; border-radius:6px; cursor:move; border:1px solid #ccc; }
+  #main{ flex:1; display:flex; justify-content:center; align-items:center; }
+  svg{ width:600px; height:800px; }
 </style>
 </head>
 <body>
-
 <div id="sidebar">
-  <div class="pad">
     <h1>路線規劃筆記本</h1>
     <input type="password" id="api-key" placeholder="OpenRouter API Key">
-    <input type="text" id="new-node" placeholder="輸入地點名稱...">
+    <input type="text" id="loc-input" placeholder="輸入地點名稱...">
     <button onclick="addNode()">新增地點</button>
     <div id="node-list"></div>
-    <button onclick="optimizeRoute()" style="background:var(--red); color:#fff; padding:15px; width:100%;">✨ 呼叫 AI 與地圖數據</button>
-    <div id="log" style="font-size:12px; margin-top:10px; color:#555;"></div>
-  </div>
+    <button onclick="aiOptimize()" style="background:var(--red); color:#fff; padding:12px; width:100%; border:none; margin-top:10px;">✨ AI 優化排序與數據</button>
+    <div id="status" style="margin-top:10px; font-size:12px;"></div>
 </div>
-
 <div id="main"><svg id="diagram"></svg></div>
-
 <script>
-let nodes = []; // 存地點
-let legsData = []; // 存距離時間
+let nodes = [];
+let legsData = [];
 
 function addNode() {
-    const val = document.getElementById('new-node').value;
+    const val = document.getElementById('loc-input').value;
     if(!val) return;
-    nodes.push({name: val, x: 300, y: 100 + nodes.length * 120});
+    nodes.push({name: val});
     renderList();
-    document.getElementById('new-node').value = '';
-    draw();
+    document.getElementById('loc-input').value = '';
+    renderDiagram();
 }
 
 function renderList() {
     const list = document.getElementById('node-list');
-    list.innerHTML = nodes.map((n, i) => `<div class="node-item">${i+1}. ${n.name}</div>`).join('');
+    list.innerHTML = nodes.map((n, i) => `
+        <div class="loc-item" draggable="true" ondragstart="startDrag(${i})" ondrop="drop(${i})" ondragover="allowDrop(event)">
+            ${i+1}. ${n.name}
+        </div>`).join('');
+}
+let draggedIdx = null;
+function startDrag(i) { draggedIdx = i; }
+function allowDrop(e) { e.preventDefault(); }
+function drop(i) {
+    const temp = nodes[draggedIdx];
+    nodes[draggedIdx] = nodes[i];
+    nodes[i] = temp;
+    renderList(); renderDiagram();
 }
 
-async function optimizeRoute() {
-    document.getElementById('log').innerText = "正在規劃與計算...";
-    // 這裡整合了 AI 優化順序的功能
-    const prompt = `為這組地點安排最短路徑: ${nodes.map(n=>n.name).join(', ')}。請根據台灣地理常識回傳 JSON: {"order": [...], "legs": [{"km": 數字, "minutes": 數字}, ...]}`;
-    
-    // API 呼叫 (保留原本的邏輯)
+async function aiOptimize() {
+    document.getElementById('status').innerText = "AI 正在計算路徑...";
+    const prompt = `為這些地點規劃最短路徑: ${nodes.map(n=>n.name).join(', ')}。請回傳 JSON: {"order": [...], "legs": [{"km": 數字, "minutes": 數字}, ...]}`;
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {"Authorization": `Bearer ${document.getElementById('api-key').value}`, "Content-Type": "application/json"},
@@ -65,28 +69,34 @@ async function optimizeRoute() {
         })
     });
     const data = await res.json();
-    const result = JSON.parse(data.choices[0].message.content);
-    
-    // 更新順序並存入距離數據
+    const result = JSON.parse(data.choices[0].message.content.replace(/```json|```/g,''));
     nodes = result.order.map(name => nodes.find(n => n.name === name));
     legsData = result.legs;
-    draw();
+    renderList(); renderDiagram();
+    document.getElementById('status').innerText = "完成！";
 }
-
-function draw() {
+  function renderDiagram() {
     const svg = document.getElementById('diagram');
     svg.innerHTML = '';
     const rc = rough.svg(svg);
     nodes.forEach((n, i) => {
-        svg.appendChild(rc.circle(300, 100 + i*150, 60, {fill: '#fff'}));
-        // 如果有數據，畫線並寫上距離
+        const y = 100 + i * 150;
+        svg.appendChild(rc.circle(300, y, 60, {fill: '#fff', strokeWidth: 2}));
+        
+        const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+        txt.setAttribute('x', 300); txt.setAttribute('y', y+5);
+        txt.setAttribute('text-anchor','middle');
+        txt.textContent = n.name;
+        svg.appendChild(txt);
+
         if(legsData[i]) {
-            svg.appendChild(rc.line(300, 130 + i*150, 300, 220 + i*150));
-            const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            txt.setAttribute('x', 310); txt.setAttribute('y', 180 + i*150);
-            txt.setAttribute('fill', 'red');
-            txt.textContent = `${legsData[i].km}km / ${legsData[i].minutes}min`;
-            svg.appendChild(txt);
+            svg.appendChild(rc.line(300, y+30, 300, y+120, {strokeWidth:2}));
+            const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+            label.setAttribute('x', 315); label.setAttribute('y', y+80);
+            label.setAttribute('fill', 'red');
+            label.setAttribute('font-weight', 'bold');
+            label.textContent = `${legsData[i].km}km / ${legsData[i].minutes}min`;
+            svg.appendChild(label);
         }
     });
 }
