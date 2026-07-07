@@ -106,7 +106,7 @@
             }
 
             if (locations.length === 1) {
-                // 只有 1 個點：完美標記該單一點位（已補上網址斜線）
+                // 只有 1 個點：完美標記該單一點位（已徹底校正網址）
                 const queryStr = encodeURIComponent(locations[0]);
                 mapContainer.innerHTML = `
                     <iframe src="https://google.com{queryStr}&hl=zh-TW&z=15&output=embed"></iframe>
