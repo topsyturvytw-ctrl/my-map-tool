@@ -31,7 +31,7 @@
                 <input type="text" id="search-input" placeholder="輸入地點（如：樹林國小）">
                 <button onclick="addLocationFromInput()">新增</button>
             </div>
-            <p style="font-size: 12px; color: #666; margin: 5px 0;">* 提示：請輸入明確的繁體中文名稱</p>
+            <p style="font-size: 12px; color: #666; margin: 5px 0;">* 提示：請輸入明確的繁體中文地名</p>
         </div>
 
         <div class="padding-box" style="flex: 1; display: flex; flex-direction: column;">
@@ -44,7 +44,7 @@
         </div>
     </div>
 
-    <div id="map-container" id="map">
+    <div id="map-container">
         <div id="map-placeholder" style="display:flex; justify-content:center; align-items:center; height:100%; color:#666;">
             請在左側輸入並新增地點，地圖將自動生成。
         </div>
@@ -58,10 +58,10 @@
             const query = input.value.trim();
             if (!query) return;
 
-            // 直接將使用者輸入的中文文字加入陣列
+            // 直接將您輸入的純文字中文地名存入陣列
             locations.push(query);
             
-            // 更新畫面
+            // 立即刷新介面與地圖
             updateLocationListUI();
             renderGoogleMap();
             
@@ -94,7 +94,7 @@
             });
         }
 
-        // 4. 利用 Google 免金鑰官方嵌入模式重新繪製多點路線地圖
+        // 4. 動態生成官方安全合規的 Google Maps 嵌入網址
         function renderGoogleMap() {
             const mapContainer = document.getElementById('map-container');
             const summary = document.getElementById('summary-content');
@@ -106,10 +106,10 @@
             }
 
             if (locations.length === 1) {
-                // 只有 1 個點：顯示該點位置
+                // 只有 1 個點：完美標記該單一點位
                 const queryStr = encodeURIComponent(locations[0]);
                 mapContainer.innerHTML = `
-                    <iframe src="https://google.com{queryStr}&t=&z=15&ie=UTF8&iwloc=&output=embed"></iframe>
+                    <iframe src="https://google.com{queryStr}&hl=zh-TW&z=15&output=embed"></iframe>
                 `;
                 summary.innerHTML = '已定位 1 個地點，請加入第 2 個地點以生成導航路線。';
                 return;
@@ -119,30 +119,24 @@
             const origin = encodeURIComponent(locations[0]);
             const destination = encodeURIComponent(locations[locations.length - 1]);
             
-            // 處理中間的中途點 (Waypoints)
-            let saddr = origin;
-            let daddr = destination;
+            let googleMapsUrl = `https://google.com{origin}&daddr=${destination}&hl=zh-TW&z=14&output=embed`;
             
-            // 建立標準 Google 多點導航嵌入網址
-            let googleMapsUrl = `https://google.com{saddr}&daddr=${daddr}&ie=UTF8&t=&z=14&output=embed`;
-            
-            // 如果超過 2 個點，把中間的點全部串接進入路徑中
+            // 如果超過 2 個點，自動使用 Google 官方 to: 語法將中間點依序串聯
             if (locations.length > 2) {
                 const middlePoints = locations.slice(1, -1).map(l => encodeURIComponent(l));
-                // 利用 Google 的 to: 語法串聯多個中途點
                 const middleStr = middlePoints.join('+to:');
-                googleMapsUrl = `https://google.com{saddr}&daddr=${middleStr}+to:${daddr}&ie=UTF8&t=&z=14&output=embed`;
+                googleMapsUrl = `https://google.com{origin}&daddr=${middleStr}+to:${destination}&hl=zh-TW&z=14&output=embed`;
             }
 
-            // 渲染地圖
+            // 將安全的 Iframe 注入右側區塊，直接載入繁中 Google Maps
             mapContainer.innerHTML = `<iframe src="${googleMapsUrl}"></iframe>`;
 
-            // 更新路線摘要說明
+            // 更新下方摘要資訊
             summary.innerHTML = `
                 📍 總站數：<b>${locations.length}</b> 站<br>
                 🚗 起點：${locations[0]}<br>
                 🏁 終點：${locations[locations.length - 1]}<br>
-                <span style="color:#28a745; font-size:12px; font-weight:bold;">* 導航詳情與預估時間已整合在右側 Google 地圖中。</span>
+                <span style="color:#28a745; font-size:12px; font-weight:bold;">* 導航路徑與各站交通時間已直接整合在右側 Google 地圖中。</span>
             `;
         }
     </script>
