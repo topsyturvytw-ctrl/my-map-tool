@@ -101,10 +101,10 @@
             }
 
             if (locations.length === 1) {
-                // 只有 1 個點：捨棄大括號，改用標準字串加法
+                // 只有 1 個點：使用 Google 地圖搜尋嵌入網址
                 const queryStr = encodeURIComponent(locations[0]);
-                const finalUrl = 'https://google.com' + queryStr + '&hl=zh-TW&z=15&output=embed';
-                
+                const finalUrl = 'https://maps.google.com/maps?q=' + queryStr + '&hl=zh-TW&z=15&output=embed';
+
                 mapContainer.innerHTML = '<iframe src="' + finalUrl + '"></iframe>';
                 summary.innerHTML = '已定位 1 個地點，請加入第 2 個地點以生成導航路線。';
                 return;
@@ -113,14 +113,14 @@
             // 有 2 個點以上
             const origin = encodeURIComponent(locations[0]);
             const destination = encodeURIComponent(locations[locations.length - 1]);
-            
-            let googleMapsUrl = 'https://google.com' + origin + '&daddr=' + destination + '&hl=zh-TW&z=14&output=embed';
-            
+
+            let googleMapsUrl = 'https://maps.google.com/maps?saddr=' + origin + '&daddr=' + destination + '&hl=zh-TW&z=14&output=embed';
+
             // 超過 2 個點，串接中間點
             if (locations.length > 2) {
                 const middlePoints = locations.slice(1, -1).map(l => encodeURIComponent(l));
                 const middleStr = middlePoints.join('+to:');
-                googleMapsUrl = 'https://google.com' + origin + '&daddr=' + middleStr + '+to:' + destination + '&hl=zh-TW&z=14&output=embed';
+                googleMapsUrl = 'https://maps.google.com/maps?saddr=' + origin + '&daddr=' + middleStr + '+to:' + destination + '&hl=zh-TW&z=14&output=embed';
             }
 
             mapContainer.innerHTML = '<iframe src="' + googleMapsUrl + '"></iframe>';
