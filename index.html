@@ -3,41 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多點路線規劃與自動排序工具</title>
+    <title>Google 多點路線規劃工具</title>
     <style>
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; display: flex; height: 100vh; }
         #sidebar { width: 350px; background: #f8f9fa; box-shadow: 2px 0 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; z-index: 1000; }
-        #map { flex: 1; height: 100%; }
+        #map-container { flex: 1; height: 100%; position: relative; background: #e5e3df; }
+        iframe { width: 100%; height: 100%; border: 0; }
         .padding-box { padding: 15px; }
         h3 { margin-top: 0; color: #333; }
         .input-group { display: flex; margin-bottom: 8px; gap: 5px; }
         input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         button { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #0056b3; }
-        button.delete-btn { background: #dc3545; padding: 4px 8px; font-weight: normal; margin-left: auto; }
+        button.delete-btn { background: #dc3545; padding: 4px 8px; font-weight: normal; margin-left: auto; border: none; border-radius: 4px; color: white; cursor: pointer; }
         button.delete-btn:hover { background: #bd2130; }
-        button.secondary-btn { background: #28a745; width: 100%; margin-top: 5px; }
-        button.secondary-btn:hover { background: #218838; }
         #info-panel { background: #e9ecef; border-radius: 4px; margin-top: 15px; font-size: 14px; }
         .location-item { display: flex; align-items: center; background: white; padding: 8px; margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; }
-        #location-list { max-height: 300px; overflow-y: auto; margin-top: 10px; }
+        #location-list { max-height: 350px; overflow-y: auto; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
         <div class="padding-box" style="border-bottom: 1px solid #ddd;">
-            <h3>📍 多點路線規劃器</h3>
+            <h3>📍 Google 多點規劃器</h3>
             <div class="input-group">
                 <input type="text" id="search-input" placeholder="輸入地點（如：樹林國小）">
                 <button onclick="addLocationFromInput()">新增</button>
             </div>
-            <p style="font-size: 12px; color: #666; margin: 5px 0;">* 提示：請輸入明確的中文地名（包含縣市更佳）</p>
-            <button class="secondary-btn" onclick="autoOptimizeRoute()" style="background: #17a2b8;">✨ 自動優化排序 (最短路徑)</button>
+            <p style="font-size: 12px; color: #666; margin: 5px 0;">* 提示：請輸入明確的繁體中文名稱</p>
         </div>
 
         <div class="padding-box" style="flex: 1; display: flex; flex-direction: column;">
-            <strong>📋 地點列表</strong>
+            <strong>📋 規劃的地點清單</strong>
             <div id="location-list"></div>
             <div id="info-panel" class="padding-box">
                 <strong>📊 路線摘要</strong>
@@ -46,49 +44,39 @@
         </div>
     </div>
 
-    <div id="map"></div>
+    <div id="map-container" id="map">
+        <div id="map-placeholder" style="display:flex; justify-content:center; align-items:center; height:100%; color:#666;">
+            請在左側輸入並新增地點，地圖將自動生成。
+        </div>
+    </div>
     <script>
         let locations = [];
 
-        // 1. 初始化，將預設提示畫面塞入地圖區塊
-        document.getElementById('map').innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%; background:#e5e3df; color:#666;">請在左側輸入並新增地點，地圖將自動生成</div>`;
-
-        // 2. 透過公開地理編碼 API 尋找台灣地點的正確經緯度
-        async function addLocationFromInput() {
+        // 1. 新增地點功能
+        function addLocationFromInput() {
             const input = document.getElementById('search-input');
             const query = input.value.trim();
             if (!query) return;
 
-            try {
-                // 自動為使用者優化，限制搜尋範圍在台灣
-                const targetQuery = query.includes('台灣') || query.includes('新北') ? query : '台灣 ' + query;
-                const response = await fetch(`https://openstreetmap.org{encodeURIComponent(targetQuery)}&limit=1`);
-                const data = await response.json();
-                
-                if (data && data.length > 0) {
-                    const lat = parseFloat(data.lat);
-                    const lon = parseFloat(data.lon);
-                    
-                    locations.push({ name: query, lat: lat, lng: lon });
-                    updateLocationListUI();
-                    renderGoogleMap();
-                    input.value = '';
-                } else {
-                    alert('搜尋不到該地點！請嘗試輸入更完整的名稱，例如：「新北市樹林國小」或「樹林火車站」。');
-                }
-            } catch (error) {
-                alert('搜尋失敗，請檢查網路連線或稍後再試。');
-            }
+            // 直接將使用者輸入的中文文字加入陣列
+            locations.push(query);
+            
+            // 更新畫面
+            updateLocationListUI();
+            renderGoogleMap();
+            
+            // 清空輸入框
+            input.value = '';
         }
 
-        // 3. 刪除特定站點
+        // 2. 刪除特定地點功能
         function deleteLocation(index) {
             locations.splice(index, 1);
             updateLocationListUI();
             renderGoogleMap();
         }
 
-        // 4. 更新左側地點清單 UI
+        // 3. 更新左側地點列表顯示
         function updateLocationListUI() {
             const listContainer = document.getElementById('location-list');
             listContainer.innerHTML = '';
@@ -98,7 +86,7 @@
                 item.className = 'location-item';
                 item.innerHTML = `
                     <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                        <strong>${index + 1}.</strong> ${loc.name}
+                        <strong>${index + 1}.</strong> ${loc}
                     </span>
                     <button class="delete-btn" onclick="deleteLocation(${index})">✕</button>
                 `;
@@ -106,74 +94,56 @@
             });
         }
 
-        // 5. 使用 Google 地圖官方嵌入式 HTTPS 技術繪製多點路線
+        // 4. 利用 Google 免金鑰官方嵌入模式重新繪製多點路線地圖
         function renderGoogleMap() {
+            const mapContainer = document.getElementById('map-container');
+            const summary = document.getElementById('summary-content');
+
             if (locations.length === 0) {
-                document.getElementById('map').innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%; background:#e5e3df; color:#666;">請在左側輸入並新增地點，地圖將自動生成</div>`;
-                document.getElementById('summary-content').innerHTML = '請先新增至少 2 個地點。';
+                mapContainer.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#666;">請在左側輸入並新增地點，地圖將自動生成。</div>`;
+                summary.innerHTML = '請先新增至少 2 個地點。';
                 return;
             }
 
-            const origin = encodeURIComponent(locations[0].name);
-            
             if (locations.length === 1) {
-                // 只有一個地點時，只顯示該點的 Google 地圖
-                document.getElementById('map').innerHTML = `
-                    <iframe width="100%" height="100%" frameborder="0" style="border:0"
-                        src="https://google.com{origin}" allowfullscreen>
-                    </iframe>`;
-                document.getElementById('summary-content').innerHTML = '已標記 1 個地點，請新增第二個地點來生成路線。';
+                // 只有 1 個點：顯示該點位置
+                const queryStr = encodeURIComponent(locations[0]);
+                mapContainer.innerHTML = `
+                    <iframe src="https://google.com{queryStr}&t=&z=15&ie=UTF8&iwloc=&output=embed"></iframe>
+                `;
+                summary.innerHTML = '已定位 1 個地點，請加入第 2 個地點以生成導航路線。';
                 return;
             }
 
-            // 多個地點時，自動生成多點導航路線網址
-            const destination = encodeURIComponent(locations[locations.length - 1].name);
-            let waypoints = '';
+            // 有 2 個點以上：將第 1 個點設為起點，最後一個點設為終點
+            const origin = encodeURIComponent(locations[0]);
+            const destination = encodeURIComponent(locations[locations.length - 1]);
+            
+            // 處理中間的中途點 (Waypoints)
+            let saddr = origin;
+            let daddr = destination;
+            
+            // 建立標準 Google 多點導航嵌入網址
+            let googleMapsUrl = `https://google.com{saddr}&daddr=${daddr}&ie=UTF8&t=&z=14&output=embed`;
+            
+            // 如果超過 2 個點，把中間的點全部串接進入路徑中
             if (locations.length > 2) {
-                const middlePoints = locations.slice(1, -1).map(l => encodeURIComponent(l.name));
-                waypoints = '&waypoints=' + middlePoints.join('|');
+                const middlePoints = locations.slice(1, -1).map(l => encodeURIComponent(l));
+                // 利用 Google 的 to: 語法串聯多個中途點
+                const middleStr = middlePoints.join('+to:');
+                googleMapsUrl = `https://google.com{saddr}&daddr=${middleStr}+to:${daddr}&ie=UTF8&t=&z=14&output=embed`;
             }
 
-            // 直接生成安全的 Google Maps 路線視窗
-            document.getElementById('map').innerHTML = `
-                <iframe width="100%" height="100%" frameborder="0" style="border:0"
-                    src="https://google.com{origin}&destination=${destination}${waypoints}&mode=driving" allowfullscreen>
-                </iframe>`;
+            // 渲染地圖
+            mapContainer.innerHTML = `<iframe src="${googleMapsUrl}"></iframe>`;
 
-            document.getElementById('summary-content').innerHTML = `
+            // 更新路線摘要說明
+            summary.innerHTML = `
                 📍 總站數：<b>${locations.length}</b> 站<br>
-                🚗 路線模式：<b>開車導航規劃</b><br>
-                <span style="color:#007bff; font-size:12px;">* 具體公里數與時間已直接在右側 Google 地圖中完整計算與顯示。</span>
+                🚗 起點：${locations[0]}<br>
+                🏁 終點：${locations[locations.length - 1]}<br>
+                <span style="color:#28a745; font-size:12px; font-weight:bold;">* 導航詳情與預估時間已整合在右側 Google 地圖中。</span>
             `;
-        }
-
-        // 6. 鄰近優化演算法：利用經緯度自動計算最短飛行距離排序
-        function autoOptimizeRoute() {
-            if (locations.length < 3) {
-                alert('請至少新增 3 個地點再進行自動優化排序。');
-                return;
-            }
-            let unvisited = [...locations];
-            let optimized = [];
-            let current = unvisited.shift();
-            optimized.push(current);
-
-            while (unvisited.length > 0) {
-                let nearestIndex = 0;
-                let minDistance = Infinity;
-                for (let i = 0; i < unvisited.length; i++) {
-                    const d = Math.pow(current.lat - unvisited[i].lat, 2) + Math.pow(current.lng - unvisited[i].lng, 2);
-                    if (d < minDistance) {
-                        minDistance = d;
-                        nearestIndex = i;
-                    }
-                }
-                current = unvisited.splice(nearestIndex, 1)[0];
-                optimized.push(current);
-            }
-            locations = optimized;
-            updateLocationListUI();
-            renderGoogleMap();
         }
     </script>
 </body>
