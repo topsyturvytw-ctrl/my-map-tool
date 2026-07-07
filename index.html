@@ -58,14 +58,9 @@
             const query = input.value.trim();
             if (!query) return;
 
-            // 直接將您輸入的純文字中文地名存入陣列
             locations.push(query);
-            
-            // 立即刷新介面與地圖
             updateLocationListUI();
             renderGoogleMap();
-            
-            // 清空輸入框
             input.value = '';
         }
 
@@ -94,50 +89,47 @@
             });
         }
 
-        // 4. 動態生成官方安全合規的 Google Maps 嵌入網址
+        // 4. 動態生成 Google Maps 嵌入網址
         function renderGoogleMap() {
             const mapContainer = document.getElementById('map-container');
             const summary = document.getElementById('summary-content');
 
             if (locations.length === 0) {
-                mapContainer.innerHTML = `<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#666;">請在左側輸入並新增地點，地圖將自動生成。</div>`;
+                mapContainer.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#666;">請在左側輸入並新增地點，地圖將自動生成。</div>';
                 summary.innerHTML = '請先新增至少 2 個地點。';
                 return;
             }
 
             if (locations.length === 1) {
-                // 只有 1 個點：標記該單一站點（確認包含 /maps/）
+                // 只有 1 個點：捨棄大括號，改用標準字串加法
                 const queryStr = encodeURIComponent(locations[0]);
-                mapContainer.innerHTML = `
-                    <iframe src="https://google.com{queryStr}&hl=zh-TW&z=15&output=embed"></iframe>
-                `;
+                const finalUrl = 'https://google.com' + queryStr + '&hl=zh-TW&z=15&output=embed';
+                
+                mapContainer.innerHTML = '<iframe src="' + finalUrl + '"></iframe>';
                 summary.innerHTML = '已定位 1 個地點，請加入第 2 個地點以生成導航路線。';
                 return;
             }
 
-            // 有 2 個點以上：第 1 個點為起點(saddr)，最後一個點為終點(daddr)
+            // 有 2 個點以上
             const origin = encodeURIComponent(locations[0]);
             const destination = encodeURIComponent(locations[locations.length - 1]);
             
-            // 2 個點時的標準導航網址（確認包含 /maps/ 與正確的 $ 變數語法）
-            let googleMapsUrl = `https://google.com{origin}&daddr=${destination}&hl=zh-TW&z=14&output=embed`;
+            let googleMapsUrl = 'https://google.com' + origin + '&daddr=' + destination + '&hl=zh-TW&z=14&output=embed';
             
-            // 如果超過 2 個點，自動使用 Google 官方 to: 語法將中間點依序串聯
+            // 超過 2 個點，串接中間點
             if (locations.length > 2) {
                 const middlePoints = locations.slice(1, -1).map(l => encodeURIComponent(l));
                 const middleStr = middlePoints.join('+to:');
-                googleMapsUrl = `https://google.com{origin}&daddr=${middleStr}+to:${destination}&hl=zh-TW&z=14&output=embed`;
+                googleMapsUrl = 'https://google.com' + origin + '&daddr=' + middleStr + '+to:' + destination + '&hl=zh-TW&z=14&output=embed';
             }
 
-            // 將安全的 Iframe 注入右側區塊，直接載入繁中 Google Maps
-            mapContainer.innerHTML = `<iframe src="${googleMapsUrl}"></iframe>`;
+            mapContainer.innerHTML = '<iframe src="' + googleMapsUrl + '"></iframe>';
 
-            // 更新下方摘要資訊
             summary.innerHTML = `
                 📍 總站數：<b>${locations.length}</b> 站<br>
                 🚗 起點：${locations[0]}<br>
                 🏁 終點：${locations[locations.length - 1]}<br>
-                <span style="color:#28a745; font-size:12px; font-weight:bold;">* 導航路徑與各站交通時間已直接整合在右側 Google 地圖中。</span>
+                <span style="color:#28a745; font-size:12px; font-weight:bold;">* 導航路徑與交通時間已直接整合在右側 Google 地圖中。</span>
             `;
         }
     </script>
